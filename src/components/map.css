@@ -1,0 +1,276 @@
+.map {
+  position: relative;
+  height: clamp(250px, 35vh, 400px);
+  margin-inline: calc(var(--gutter) * -1);
+}
+
+.map-stage {
+  --map-water-1: #c4e4fb;
+  --map-water-2: #8cc4ef;
+  --map-land: #f6f3ec;
+  --map-continent: #e5efd9;
+  --map-border: rgba(255, 255, 255, 0.95);
+  --map-country-fill: rgba(0, 122, 255, 0.16);
+  --map-country-stroke: rgba(0, 122, 255, 0.85);
+  --map-river: #1d8cf8;
+  --map-range: #c8742c;
+  --map-region: #ff5a36;
+  --map-area-fill: rgba(214, 160, 84, 0.22);
+  --map-area-stroke: rgba(178, 120, 46, 0.75);
+  --map-shade: rgba(20, 70, 130, 0.12);
+  --map-atmosphere: rgba(120, 186, 248, 0.5);
+  --map-atmosphere-edge: rgba(120, 186, 248, 0);
+
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 28px 28px 0 0;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #fbfcfe 0%, #eef2f7 55%, #e6ebf2 100%);
+  /* Eased fade: extra stops along an ease curve so the edge is never visible. */
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 58%,
+    rgba(0, 0, 0, 0.86) 67%,
+    rgba(0, 0, 0, 0.62) 76%,
+    rgba(0, 0, 0, 0.36) 85%,
+    rgba(0, 0, 0, 0.14) 93%,
+    transparent 100%
+  );
+}
+
+@media (prefers-color-scheme: dark) {
+  .map-stage {
+    --map-water-1: #1c3a57;
+    --map-water-2: #0f2236;
+    --map-land: #3a3d43;
+    --map-continent: #47524a;
+    --map-border: rgba(255, 255, 255, 0.16);
+    --map-country-fill: rgba(10, 132, 255, 0.3);
+    --map-country-stroke: rgba(64, 156, 255, 0.95);
+    --map-river: #4aa8ff;
+    --map-range: #e0904a;
+    --map-region: #ff6b4a;
+    --map-area-fill: rgba(224, 168, 92, 0.18);
+    --map-area-stroke: rgba(230, 170, 90, 0.7);
+    --map-shade: rgba(0, 0, 0, 0.45);
+    --map-atmosphere: rgba(70, 140, 220, 0.35);
+    --map-atmosphere-edge: rgba(70, 140, 220, 0);
+    background: radial-gradient(120% 90% at 50% 0%, #141a24 0%, #0b0f16 60%, #07090d 100%);
+  }
+}
+
+.map-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.map-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Blurred copy of the globe, revealed toward the bottom edge. */
+.map-canvas--blur {
+  filter: blur(9px);
+  mask-image: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.5) 66%, #000 82%);
+  pointer-events: none;
+}
+
+/* Pin */
+.map-pin {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  visibility: hidden;
+  --pin: var(--accent);
+}
+.map-pin--mountain {
+  --pin: #e07a2c;
+}
+.map-pin-dot,
+.map-pin-pulse {
+  position: absolute;
+  left: -6px;
+  top: -6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.map-pin-dot {
+  background: var(--pin);
+  box-shadow:
+    0 0 0 2.5px #fff,
+    0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.map-pin--mountain .map-pin-dot {
+  border-radius: 2px;
+  transform: rotate(45deg) scale(0.9);
+}
+.map-pin-pulse {
+  background: var(--pin);
+  opacity: 0;
+  animation: pin-pulse 2400ms var(--ease-out) infinite;
+}
+@keyframes pin-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.42;
+  }
+  100% {
+    transform: scale(3.4);
+    opacity: 0;
+  }
+}
+
+/* Labels, styled after map cartography: halo for legibility over any terrain */
+.map-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  --halo: rgba(255, 255, 255, 0.92);
+}
+@media (prefers-color-scheme: dark) {
+  .map-label {
+    --halo: rgba(0, 0, 0, 0.75);
+  }
+}
+.map-label-text {
+  position: absolute;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  font-weight: 600;
+  color: var(--text);
+  text-shadow:
+    0 0 2px var(--halo),
+    0 0 4px var(--halo),
+    0 0 10px var(--halo);
+  animation: label-in 240ms var(--ease-out);
+}
+.map-label--continent .map-label-text {
+  font-size: 13px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.map-label--country .map-label-text {
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.map-label--city .map-label-text,
+.map-label--capital .map-label-text,
+.map-label--mountain .map-label-text {
+  font-size: 14px;
+  transform: translate(14px, -50%);
+}
+.map-label--river .map-label-text {
+  font-size: 14px;
+  font-style: italic;
+  color: var(--map-river);
+  transform: translate(10px, -130%);
+}
+.map-label--range .map-label-text,
+.map-label--desert .map-label-text {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #a8601f;
+}
+.map-label--region .map-label-text {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--map-region);
+}
+@media (prefers-color-scheme: dark) {
+  .map-label--range .map-label-text,
+  .map-label--desert .map-label-text {
+    color: #f0b070;
+  }
+}
+@keyframes label-in {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+  }
+}
+
+/* Breadcrumb over the faded edge */
+.map-hud {
+  position: absolute;
+  inset: auto 0 18% 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.map-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px 7px 8px;
+  border-radius: 999px;
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow:
+    0 0 0 0.5px var(--hairline),
+    0 4px 16px rgba(0, 0, 0, 0.06);
+  font-size: 14px;
+  animation: crumb-in 220ms var(--ease-out);
+}
+.map-kind {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.map-trail {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+.map-trail > span + span::before {
+  content: '\203A';
+  margin-right: 6px;
+  color: var(--text-tertiary);
+}
+.map-trail .is-current {
+  color: var(--text);
+  font-weight: 600;
+}
+@keyframes crumb-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+    filter: blur(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-pin-pulse {
+    animation: none;
+  }
+  .map-crumb {
+    animation: fade-in 200ms ease;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .map-canvas--blur {
+    display: none;
+  }
+  .map-crumb {
+    background: var(--surface);
+    backdrop-filter: none;
+  }
+}
