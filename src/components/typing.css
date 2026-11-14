@@ -1,0 +1,152 @@
+.typing {
+  position: relative;
+  --lh: 1.7;
+  --type-size: clamp(19px, 2.4vw, 23px);
+}
+
+.typing-stats {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 28px;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.stat {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.stat-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.stat-label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.stat--strong .stat-value {
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+}
+.typing-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--hairline);
+  overflow: hidden;
+}
+.typing-progress > span {
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  transform-origin: left;
+  transition: transform 160ms var(--ease-out);
+}
+
+.typing-box {
+  position: relative;
+  height: calc(var(--type-size) * var(--lh) * 3);
+  overflow: hidden;
+  font-size: var(--type-size);
+  line-height: var(--lh);
+  letter-spacing: -0.005em;
+  /* Fade the third line slightly so attention stays on the current one. */
+  mask-image: linear-gradient(to bottom, #000 62%, rgba(0, 0, 0, 0.45) 100%);
+}
+.typing-inner {
+  position: relative;
+  transition: transform 180ms var(--ease-out);
+}
+
+.word-wrap {
+  display: inline-block;
+  white-space: nowrap;
+}
+.ch {
+  color: var(--text-tertiary);
+}
+.ch.is-space {
+  white-space: pre;
+}
+.ch.is-ok {
+  color: var(--text);
+}
+.ch.is-bad {
+  color: var(--red);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
+}
+.ch.is-space.is-bad {
+  background: color-mix(in oklch, var(--red) 22%, transparent);
+  border-radius: 3px;
+  text-decoration: none;
+}
+
+/* Place names: a quiet underline that wakes up when the map is showing that place. */
+.ch.is-ref {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklch, var(--accent) 30%, transparent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 6px;
+}
+.ch.is-ref-active {
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+}
+.ch.is-ref-active.is-ok {
+  color: var(--accent-text);
+}
+.ch.is-ref.is-bad {
+  text-decoration-color: var(--red);
+}
+
+.caret {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--accent);
+  /* Short and ease-out: smooths the jump between letters without trailing behind the fingers. */
+  transition: transform 80ms var(--ease-out);
+  animation: caret-blink 1100ms steps(1) infinite;
+}
+.caret.is-typing {
+  animation: none;
+}
+@keyframes caret-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  95% {
+    opacity: 0;
+  }
+}
+
+.typing-hint {
+  margin: 0 0 0 auto;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  transition: opacity 200ms ease;
+}
+.typing-hint.is-hidden {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret,
+  .typing-inner {
+    transition: none;
+  }
+}
