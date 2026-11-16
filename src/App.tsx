@@ -117,7 +117,7 @@ export default function App() {
             <TypingArea lesson={lesson} session={session} activeSpan={activeSpan} />
           )}
         </div>
-        <Keyboard target={target} nextChar={finished ? undefined : lesson.text[cursor]} />
+        <Keyboard target={target} />
       </main>
       <footer className="footer">
         <span>

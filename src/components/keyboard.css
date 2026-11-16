@@ -23,24 +23,375 @@
 }
 
 .kb-viewport {
-  --u: min(42px, calc((100cqw - 24px) / 16.6));
+  /* Key size. --u-fit fills the content column; the default caps at 42px. Resizing scales it between a
+     28px key (labels stay legible) and a 46px one, and never wider than the column. Mirrors Keyboard.tsx. */
+  --u-fit: calc((100cqw - 24px) / 16.6);
+  --u-base: min(42px, var(--u-fit));
+  --u: clamp(min(28px, var(--u-base)), calc(var(--u-base) * var(--kb-scale, 1)), min(46px, var(--u-fit)));
   --travel: calc(var(--u) * 0.17);
   --gap: calc(var(--u) * 0.055);
+  /* Desk angle, and how far the keyboard's top edge is lifted off it. */
+  --kb-tilt: 50deg;
+  --kb-lift: 20deg;
+  position: relative;
+  z-index: 2;
   display: grid;
-  place-items: center;
-  height: calc(var(--u) * 6);
-  perspective: calc(var(--u) * 30);
-  perspective-origin: 50% 0%;
+  height: calc(var(--u) * 6.8);
   user-select: none;
+  /* The box spans the full column; only the keyboard itself should catch the pointer. */
+  pointer-events: none;
 }
 
-/* Three-quarter view: tilted back and turned slightly, like a keyboard on a desk seen from the side. */
+/* Flat wrapper that owns the perspective, so it can be blurred without flattening the 3D keyboard inside. */
+.kb-stage {
+  grid-area: 1 / 1;
+  display: grid;
+  place-items: center;
+  perspective: calc(var(--u) * 30);
+  perspective-origin: 50% 0%;
+  transition:
+    filter 260ms var(--ease-out),
+    opacity 260ms var(--ease-out);
+}
+.kb-viewport.is-hinting .kb-stage {
+  filter: blur(calc(var(--u) * 0.14));
+  opacity: 0.55;
+}
+
+/* The scene is the desk: square to the screen's x-axis, lying back into the screen. */
 .kb-scene {
   position: relative;
   width: calc(var(--u) * 15);
   height: calc(var(--u) * 5);
   transform-style: preserve-3d;
-  transform: translateY(calc(var(--u) * -0.35)) rotateX(38deg) rotateZ(-6deg);
+  /* Room above for the lifted top edge. */
+  margin-top: calc(var(--u) * 0.6);
+  transform: rotateX(var(--kb-tilt));
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+}
+.kb-viewport.is-moving .kb-scene {
+  cursor: grabbing;
+}
+.kb-viewport.is-resizing .kb-scene {
+  cursor: nwse-resize;
+}
+
+/* Resize button: stands up beside the keyboard's front-right corner, turned to face the viewer. */
+.kb-resize {
+  --grip-scale: 1;
+  position: absolute;
+  right: calc(var(--u) * -1.35);
+  bottom: calc(var(--u) * -0.4);
+  display: grid;
+  place-items: center;
+  width: calc(var(--u) * 0.82);
+  height: calc(var(--u) * 0.82);
+  border-radius: 50%;
+  background: linear-gradient(180deg, color-mix(in oklch, var(--surface) 92%, #fff), var(--surface));
+  color: var(--text-secondary);
+  box-shadow:
+    0 0 0 0.5px var(--hairline),
+    0 calc(var(--u) * 0.06) calc(var(--u) * 0.22) rgba(0, 0, 0, 0.22);
+  transform-origin: 50% 100%;
+  transform: rotateX(calc(var(--kb-lift) - var(--kb-tilt))) scale(var(--grip-scale));
+  cursor: nwse-resize;
+  opacity: 0;
+  transition:
+    opacity 160ms ease,
+    transform 160ms var(--ease-out),
+    color 160ms ease,
+    background-color 160ms ease;
+}
+/* Bigger hit area than the visible button. */
+.kb-resize::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--u) * -0.22);
+  border-radius: 50%;
+}
+.kb-resize svg {
+  width: 52%;
+  height: 52%;
+}
+.kb-scene:hover .kb-resize,
+.kb-viewport.is-dragging .kb-resize {
+  opacity: 1;
+}
+/* After the hover hint plays through, pulse once so the eye finds the button it talked about. */
+.kb-viewport.is-cueing .kb-resize {
+  opacity: 1;
+  animation: kb-grip-pulse 900ms var(--ease-out);
+}
+.kb-resize:hover {
+  --grip-scale: 1.12;
+  color: var(--text);
+}
+.kb-viewport.is-resizing .kb-resize {
+  --grip-scale: 0.94;
+  background: var(--accent);
+  color: #fff;
+  transition-duration: 0ms;
+}
+@keyframes kb-grip-pulse {
+  0% {
+    box-shadow:
+      0 0 0 0 color-mix(in oklch, var(--accent) 70%, transparent),
+      0 calc(var(--u) * 0.06) calc(var(--u) * 0.22) rgba(0, 0, 0, 0.22);
+  }
+  100% {
+    box-shadow:
+      0 0 0 calc(var(--u) * 0.4) transparent,
+      0 calc(var(--u) * 0.06) calc(var(--u) * 0.22) rgba(0, 0, 0, 0.22);
+  }
+}
+@media (hover: none) {
+  .kb-resize {
+    opacity: 1;
+  }
+}
+
+/* Hover hint: two tiny gesture demos over the blurred keyboard, after Apple's trackpad previews.
+   Flat (outside the 3D scene) and never takes the pointer, so a drag can start straight through it.
+
+   Every resting style below is the demo's *final* frame and the keyframes start from the first frame,
+   so when the hint is dismissed mid-fade nothing snaps back. Only transform, opacity and clip-path move. */
+.kb-hint {
+  grid-area: 1 / 1;
+  place-self: center;
+  margin-top: calc(var(--u) * 0.6);
+  display: flex;
+  gap: 10px;
+  pointer-events: none;
+}
+.kb-demo {
+  --demo-duration: 2200ms;
+  --demo-delay: 180ms;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px 10px;
+  border-radius: 22px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  backdrop-filter: blur(16px) saturate(1.6);
+  box-shadow:
+    0 0 0 0.5px var(--hairline),
+    0 12px 32px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  transform: translateY(6px) scale(0.96);
+  /* Leaving is quicker than arriving. */
+  transition:
+    opacity 140ms ease-out,
+    transform 140ms ease-out;
+}
+.kb-demo--resize {
+  --demo-delay: 420ms;
+}
+.kb-viewport.is-hinting .kb-demo {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 220ms var(--ease-out),
+    transform 420ms var(--ease-out);
+}
+.kb-viewport.is-hinting .kb-demo--resize {
+  transition-delay: 50ms;
+}
+.kb-demo figcaption {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.kb-demo-stage {
+  position: relative;
+  width: 108px;
+  height: 72px;
+}
+.kb-demo-shape {
+  position: absolute;
+  border-radius: 7px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--accent) 46%, var(--surface)),
+    color-mix(in oklch, var(--accent) 30%, var(--surface))
+  );
+}
+
+.kb-demo-pointer {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  opacity: 0;
+}
+.kb-demo-pointer span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: color-mix(in oklch, var(--text) 45%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--surface) 75%, transparent),
+    0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+/* Drag: a card the size of a keyboard glyph, picked up and moved down. */
+.kb-drag-group {
+  position: absolute;
+  inset: 0;
+  transform: translateY(28px);
+}
+.kb-drag-card {
+  left: 30px;
+  top: 6px;
+  width: 48px;
+  height: 30px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.kb-demo--drag .kb-demo-pointer {
+  left: 54px;
+  top: 21px;
+}
+
+/* Resize: the corner follows the pointer out; clip-path keeps the corners round while it grows. */
+.kb-resize-box {
+  left: 18px;
+  top: 8px;
+  width: 64px;
+  height: 46px;
+  clip-path: inset(0 0 0 0 round 7px);
+}
+.kb-resize-handle {
+  position: absolute;
+  left: 58px;
+  top: 36px;
+  transform: translate(24px, 18px);
+}
+
+.kb-viewport.is-hinting .kb-demo-pointer {
+  animation: kb-pointer-travel var(--demo-duration) var(--demo-delay) both;
+}
+.kb-viewport.is-hinting .kb-demo-pointer span {
+  animation: kb-pointer-press var(--demo-duration) var(--demo-delay) both;
+}
+.kb-viewport.is-hinting .kb-drag-group {
+  animation: kb-drag-move var(--demo-duration) var(--demo-delay) both;
+}
+.kb-viewport.is-hinting .kb-drag-card {
+  animation: kb-drag-lift var(--demo-duration) var(--demo-delay) both;
+}
+.kb-viewport.is-hinting .kb-resize-box {
+  animation: kb-resize-box var(--demo-duration) var(--demo-delay) both;
+}
+.kb-viewport.is-hinting .kb-resize-handle {
+  animation: kb-resize-handle var(--demo-duration) var(--demo-delay) both;
+}
+
+/* One timeline shared by both demos: glide in (0–20%), press (22–28%), move (30–62%), let go (64–72%),
+   drift off (72–90%). Ease-out for anything arriving or reacting; a soft ease-in-out for the move itself,
+   the way a hand accelerates and settles. */
+@keyframes kb-pointer-travel {
+  0% {
+    opacity: 0;
+    transform: translate(20px, 18px);
+    animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  20%,
+  72% {
+    opacity: 1;
+    transform: translate(0, 0);
+    animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  90%,
+  100% {
+    opacity: 0;
+    transform: translate(10px, 8px);
+  }
+}
+@keyframes kb-pointer-press {
+  0%,
+  22% {
+    transform: scale(1);
+    background-color: color-mix(in oklch, var(--text) 45%, transparent);
+    animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  28%,
+  64% {
+    transform: scale(0.76);
+    background-color: color-mix(in oklch, var(--text) 75%, transparent);
+    animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  72%,
+  100% {
+    transform: scale(1);
+    background-color: color-mix(in oklch, var(--text) 45%, transparent);
+  }
+}
+@keyframes kb-drag-move {
+  0%,
+  30% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  62%,
+  100% {
+    transform: translateY(28px);
+  }
+}
+@keyframes kb-drag-lift {
+  0%,
+  22% {
+    transform: scale(1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+    animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  28%,
+  64% {
+    transform: scale(1.07);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+    animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  72%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  }
+}
+@keyframes kb-resize-box {
+  0%,
+  30% {
+    clip-path: inset(0 24px 18px 0 round 7px);
+    animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  62%,
+  100% {
+    clip-path: inset(0 0 0 0 round 7px);
+  }
+}
+@keyframes kb-resize-handle {
+  0%,
+  30% {
+    transform: translate(0, 0);
+    animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  62%,
+  100% {
+    transform: translate(24px, 18px);
+  }
+}
+
+/* The keyboard on the desk: front edge stays planted, top edge lifts toward the viewer. */
+.kb-body {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform-origin: 50% calc(100% + var(--u) * 0.4);
+  transform: rotateX(calc(var(--kb-lift) * -1));
 }
 
 .kb-case {
@@ -225,65 +576,20 @@
     0 0 0 calc(var(--u) * 0.06) color-mix(in oklch, var(--fc) 45%, transparent),
     0 0 calc(var(--u) * 0.4) var(--fc);
 }
-/* Caption */
-.kb-caption {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  margin-top: 4px;
-}
-.kb-legend {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px 14px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.kb-legend li {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.kb-legend li:nth-child(4) {
-  margin-right: 18px;
-}
-.kb-legend .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--fc);
-}
-.kb-next {
-  margin: 0;
-  min-height: 26px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-.kb-next-finger {
-  margin-left: 4px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: color-mix(in oklch, var(--fc) 16%, transparent);
-  color: color-mix(in oklch, var(--fc) 70%, var(--text));
-  font-weight: 600;
-  font-size: 12px;
-}
-.kb-next-idle {
-  color: var(--text-tertiary);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .finger,
   .key-top,
   .key-wall {
     transition: none;
+  }
+  /* No motion: the tiles just fade in, showing each gesture's end state with its label. */
+  .kb-demo,
+  .kb-viewport.is-hinting .kb-demo {
+    transform: none;
+    transition: opacity 200ms ease;
+  }
+  .kb-viewport.is-hinting .kb-hint *,
+  .kb-viewport.is-cueing .kb-resize {
+    animation: none;
   }
 }
